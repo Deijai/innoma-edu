@@ -1,45 +1,105 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
-import { Platform } from 'react-native';
+import { Text, View } from 'react-native';
+import { useThemeStore } from '../../store/themeStore';
 
-import { HapticTab } from '@/components/HapticTab';
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import TabBarBackground from '@/components/ui/TabBarBackground';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+export default function TabsLayout() {
+    const { theme } = useThemeStore();
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+    return (
+        <Tabs
+            screenOptions={{
+                tabBarActiveTintColor: theme.colors.primary,
+                tabBarInactiveTintColor: theme.colors.textSecondary,
+                headerShown: false,
+                tabBarStyle: {
+                    backgroundColor: theme.colors.background,
+                    borderTopColor: theme.colors.border,
+                    height: 65,
+                    paddingBottom: 10,
+                    paddingTop: 10,
+                },
+                headerStyle: {
+                    backgroundColor: theme.colors.background,
+                },
+                headerTintColor: theme.colors.text,
+                headerTitleStyle: {
+                    fontWeight: 'bold',
+                },
+            }}
+        >
+            <Tabs.Screen
+                name="index"
+                options={{
+                    title: 'Início',
+                    tabBarIcon: ({ color, size }) => (
+                        <TabIcon name="🏠" color={color} size={size} />
+                    ),
+                }}
+            />
+            <Tabs.Screen
+                name="tasks"
+                options={{
+                    title: 'Tarefas',
+                    tabBarIcon: ({ color, size }) => (
+                        <TabIcon name="📋" color={color} size={size} />
+                    ),
+                }}
+            />
+            <Tabs.Screen
+                name="add-task"
+                options={{
+                    title: 'Adicionar',
+                    tabBarIcon: ({ color, size }) => (
+                        <TabIcon name="➕" color={color} size={size} />
+                    ),
+                }}
+            />
+            <Tabs.Screen
+                name="classroom"
+                options={{
+                    title: 'Sala de Aula',
+                    tabBarIcon: ({ color, size }) => (
+                        <TabIcon name="🎓" color={color} size={size} />
+                    ),
+                }}
+            />
+            <Tabs.Screen
+                name="add-class"
+                options={{
+                    title: 'Adicionar Aula',
+                    tabBarIcon: ({ color, size }) => (
+                        <TabIcon name="📚" color={color} size={size} />
+                    ),
+                }}
+            />
+            <Tabs.Screen
+                name="chat"
+                options={{
+                    title: 'Chat',
+                    tabBarIcon: ({ color, size }) => (
+                        <TabIcon name="💬" color={color} size={size} />
+                    ),
+                }}
+            />
+        </Tabs>
+    );
+}
 
-  return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-        tabBarBackground: TabBarBackground,
-        tabBarStyle: Platform.select({
-          ios: {
-            // Use a transparent background on iOS to show the blur effect
-            position: 'absolute',
-          },
-          default: {},
-        }),
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-        }}
-      />
-    </Tabs>
-  );
+function TabIcon({ name, color, size }: { name: string; color: string; size: number }) {
+    return (
+        <View style={{
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: size + 4,
+            height: size + 4,
+        }}>
+            <Text style={{
+                fontSize: size,
+                color,
+                textAlign: 'center',
+            }}>
+                {name}
+            </Text>
+        </View>
+    );
 }
