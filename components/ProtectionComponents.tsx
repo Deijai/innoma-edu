@@ -1,10 +1,50 @@
-// components/ProtectionComponents.tsx - Componentes SIMPLES e OTIMIZADOS
+// components/ProtectionComponents.tsx - Componentes CORRIGIDOS
 
 import { useRouter } from 'expo-router';
 import React, { ReactNode } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { usePermissions } from '../hooks/usePermissions';
+import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
+
+// Hook de permissões simplificado (integrado aqui temporariamente)
+const usePermissions = () => {
+    const { user, isAuthenticated, isInitialized } = useAuthStore();
+
+    const hasRole = (role: string) => {
+        return user?.role === role;
+    };
+
+    const hasPermission = (permission: string) => {
+        if (!user) return false;
+
+        // Permissões baseadas em roles
+        switch (user.role) {
+            case 'student':
+                return ['canViewTasks', 'canViewClasses', 'canUseChat'].includes(permission);
+            case 'teacher':
+                return ['canViewTasks', 'canViewClasses', 'canUseChat', 'canCreateTask', 'canCreateClass'].includes(permission);
+            case 'director':
+                return true; // Diretor tem todas as permissões
+            default:
+                return false;
+        }
+    };
+
+    const isStudent = user?.role === 'student';
+    const isTeacher = user?.role === 'teacher';
+    const isDirector = user?.role === 'director';
+
+    return {
+        user,
+        isAuthenticated,
+        isInitialized,
+        hasRole,
+        hasPermission,
+        isStudent,
+        isTeacher,
+        isDirector,
+    };
+};
 
 // ==========================================
 // COMPONENTE PRINCIPAL DE PROTEÇÃO
@@ -51,7 +91,7 @@ export const Protected: React.FC<ProtectedProps> = ({
     }
 
     // Verificar permissão
-    if (requirePermission && !hasPermission(requirePermission as any)) {
+    if (requirePermission && !hasPermission(requirePermission)) {
         return showError ? <UnauthorizedScreen /> : (fallback || null);
     }
 
@@ -93,7 +133,7 @@ export const ShowIf: React.FC<ShowIfProps> = ({
     }
 
     // Verificar permissão
-    if (permission && !hasPermission(permission as any)) {
+    if (permission && !hasPermission(permission)) {
         return null;
     }
 
@@ -128,7 +168,7 @@ export const ProtectedButton: React.FC<ProtectedButtonProps> = ({
 
     // Verificar se tem acesso
     const hasAccess = (!requireRole || hasRole(requireRole)) &&
-        (!requirePermission || hasPermission(requirePermission as any));
+        (!requirePermission || hasPermission(requirePermission));
 
     // Se não tem acesso, não mostrar
     if (!hasAccess) {
@@ -263,7 +303,7 @@ const UnauthorizedScreen: React.FC = () => {
 // ==========================================
 
 interface RoleBasedProps {
-    children: ReactNode;
+    children?: ReactNode;
     studentContent?: ReactNode;
     teacherContent?: ReactNode;
     directorContent?: ReactNode;
@@ -289,7 +329,7 @@ export const RoleBased: React.FC<RoleBasedProps> = ({
         return <>{directorContent}</>;
     }
 
-    return <>{children}</>;
+    return <>{children || null}</>;
 };
 
 // ==========================================
@@ -324,7 +364,7 @@ export const useAccessControl = () => {
     }) => {
         if (requirements.auth && !isAuthenticated) return false;
         if (requirements.role && !hasRole(requirements.role)) return false;
-        if (requirements.permission && !hasPermission(requirements.permission as any)) return false;
+        if (requirements.permission && !hasPermission(requirements.permission)) return false;
         return true;
     };
 

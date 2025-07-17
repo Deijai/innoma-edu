@@ -1,36 +1,13 @@
-// app/(tabs)/_layout.tsx - Com controle de permissões por tab
+// app/(tabs)/_layout.tsx - Layout OTIMIZADO com permissões
 
 import { Tabs } from 'expo-router';
 import { Text, View } from 'react-native';
-import { useAuthStore } from '../../store/authStore';
+import { usePermissions } from '../../hooks/usePermissions';
 import { useThemeStore } from '../../store/themeStore';
 
 export default function TabsLayout() {
     const { theme } = useThemeStore();
-    const { user } = useAuthStore();
-
-    // Verificar permissões para cada tab
-    const hasPermission = (tabName: string) => {
-        if (!user) return false;
-
-        switch (tabName) {
-            case 'index':
-            case 'tasks':
-            case 'classroom':
-            case 'chat':
-                return true; // Todos podem ver essas tabs
-
-            case 'add-task':
-            case 'add-class':
-                return user.role === 'teacher' || user.role === 'director';
-
-            case 'settings':
-                return user.role === 'director';
-
-            default:
-                return false;
-        }
-    };
+    const { availableTabs, canAccessTab } = usePermissions();
 
     return (
         <Tabs
@@ -51,9 +28,10 @@ export default function TabsLayout() {
                 headerTitleStyle: {
                     fontWeight: 'bold',
                 },
+                headerShown: false, // Esconder header padrão
             }}
         >
-            {/* Tabs básicas - sempre visíveis */}
+            {/* Renderizar todas as tabs, mas só mostrar as permitidas */}
             <Tabs.Screen
                 name="index"
                 options={{
@@ -61,6 +39,7 @@ export default function TabsLayout() {
                     tabBarIcon: ({ color, size }) => (
                         <TabIcon name="🏠" color={color} size={size} />
                     ),
+                    href: canAccessTab('index') ? undefined : null,
                 }}
             />
 
@@ -71,6 +50,7 @@ export default function TabsLayout() {
                     tabBarIcon: ({ color, size }) => (
                         <TabIcon name="📋" color={color} size={size} />
                     ),
+                    href: canAccessTab('tasks') ? undefined : null,
                 }}
             />
 
@@ -81,6 +61,7 @@ export default function TabsLayout() {
                     tabBarIcon: ({ color, size }) => (
                         <TabIcon name="🎓" color={color} size={size} />
                     ),
+                    href: canAccessTab('classroom') ? undefined : null,
                 }}
             />
 
@@ -91,49 +72,47 @@ export default function TabsLayout() {
                     tabBarIcon: ({ color, size }) => (
                         <TabIcon name="💬" color={color} size={size} />
                     ),
+                    href: canAccessTab('chat') ? undefined : null,
                 }}
             />
 
-            {/* Tabs condicionais - só aparecem se tiver permissão */}
             <Tabs.Screen
                 name="add-task"
-                options={hasPermission('add-task') ? {
+                options={{
                     title: 'Nova Tarefa',
                     tabBarIcon: ({ color, size }) => (
                         <TabIcon name="➕" color={color} size={size} />
                     ),
-                } : {
-                    href: null, // 🎯 ISSO FAZ A TAB SUMIR!
+                    href: canAccessTab('add-task') ? undefined : null,
                 }}
             />
 
             <Tabs.Screen
                 name="add-class"
-                options={hasPermission('add-class') ? {
+                options={{
                     title: 'Nova Aula',
                     tabBarIcon: ({ color, size }) => (
                         <TabIcon name="📚" color={color} size={size} />
                     ),
-                } : {
-                    href: null, // 🎯 ISSO FAZ A TAB SUMIR!
+                    href: canAccessTab('add-class') ? undefined : null,
                 }}
             />
 
             <Tabs.Screen
                 name="settings"
-                options={hasPermission('settings') ? {
+                options={{
                     title: 'Configurações',
                     tabBarIcon: ({ color, size }) => (
                         <TabIcon name="⚙️" color={color} size={size} />
                     ),
-                } : {
-                    href: null, // 🎯 ISSO FAZ A TAB SUMIR!
+                    href: canAccessTab('settings') ? undefined : null,
                 }}
             />
         </Tabs>
     );
 }
 
+// Componente de ícone otimizado
 function TabIcon({ name, color, size }: { name: string; color: string; size: number }) {
     return (
         <View style={{
@@ -150,5 +129,41 @@ function TabIcon({ name, color, size }: { name: string; color: string; size: num
                 {name}
             </Text>
         </View>
+    );
+}
+
+// Componente alternativo usando a lista de tabs disponíveis
+export function DynamicTabsLayout() {
+    const { theme } = useThemeStore();
+    const { availableTabs } = usePermissions();
+
+    return (
+        <Tabs
+            screenOptions={{
+                tabBarActiveTintColor: theme.colors.primary,
+                tabBarInactiveTintColor: theme.colors.textSecondary,
+                tabBarStyle: {
+                    backgroundColor: theme.colors.background,
+                    borderTopColor: theme.colors.border,
+                    height: 65,
+                    paddingBottom: 10,
+                    paddingTop: 10,
+                },
+                headerShown: false,
+            }}
+        >
+            {availableTabs.map((tab) => (
+                <Tabs.Screen
+                    key={tab.name}
+                    name={tab.name}
+                    options={{
+                        title: tab.title,
+                        tabBarIcon: ({ color, size }) => (
+                            <TabIcon name={tab.icon} color={color} size={size} />
+                        ),
+                    }}
+                />
+            ))}
+        </Tabs>
     );
 }
