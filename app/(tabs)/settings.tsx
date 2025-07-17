@@ -241,204 +241,202 @@ export default function SettingsScreen() {
     }
 
     return (
-        <Protected requireRole="director" showError>
-            <View style={styles.container}>
-                <View style={styles.header}>
-                    <Text style={styles.title}>Configurações</Text>
-                    <Text style={styles.subtitle}>Gerencie suas preferências</Text>
+        <View style={styles.container}>
+            <View style={styles.header}>
+                <Text style={styles.title}>Configurações</Text>
+                <Text style={styles.subtitle}>Gerencie suas preferências</Text>
+            </View>
+
+            <ScrollView style={styles.content}>
+                {/* Informações do Usuário */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>👤 Perfil</Text>
+                    <View style={styles.userInfo}>
+                        <View style={styles.avatar}>
+                            <Text style={styles.avatarText}>
+                                {getUserInitials(user.name)}
+                            </Text>
+                        </View>
+                        <View style={styles.userDetails}>
+                            <Text style={styles.userName}>{user.name}</Text>
+                            <Text style={styles.userEmail}>{user.email}</Text>
+                            <Text style={styles.userRole}>
+                                {getRoleDisplayName(user.role)}
+                            </Text>
+                        </View>
+                    </View>
                 </View>
 
-                <ScrollView style={styles.content}>
-                    {/* Informações do Usuário */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>👤 Perfil</Text>
-                        <View style={styles.userInfo}>
-                            <View style={styles.avatar}>
-                                <Text style={styles.avatarText}>
-                                    {getUserInitials(user.name)}
-                                </Text>
-                            </View>
-                            <View style={styles.userDetails}>
-                                <Text style={styles.userName}>{user.name}</Text>
-                                <Text style={styles.userEmail}>{user.email}</Text>
-                                <Text style={styles.userRole}>
-                                    {getRoleDisplayName(user.role)}
-                                </Text>
-                            </View>
+                {/* Preferências */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>⚙️ Preferências</Text>
+
+                    <View style={styles.settingItem}>
+                        <View style={styles.settingLeft}>
+                            <Text style={styles.settingTitle}>Tema Escuro</Text>
+                            <Text style={styles.settingDescription}>
+                                Alternar entre tema claro e escuro
+                            </Text>
+                        </View>
+                        <View style={styles.settingRight}>
+                            <Switch
+                                value={theme.isDark}
+                                onValueChange={toggleTheme}
+                                trackColor={{
+                                    false: theme.colors.border,
+                                    true: theme.colors.primary
+                                }}
+                                thumbColor={theme.colors.background}
+                            />
                         </View>
                     </View>
 
-                    {/* Preferências */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>⚙️ Preferências</Text>
-
-                        <View style={styles.settingItem}>
-                            <View style={styles.settingLeft}>
-                                <Text style={styles.settingTitle}>Tema Escuro</Text>
-                                <Text style={styles.settingDescription}>
-                                    Alternar entre tema claro e escuro
-                                </Text>
-                            </View>
-                            <View style={styles.settingRight}>
-                                <Switch
-                                    value={theme.isDark}
-                                    onValueChange={toggleTheme}
-                                    trackColor={{
-                                        false: theme.colors.border,
-                                        true: theme.colors.primary
-                                    }}
-                                    thumbColor={theme.colors.background}
-                                />
-                            </View>
+                    <View style={styles.settingItem}>
+                        <View style={styles.settingLeft}>
+                            <Text style={styles.settingTitle}>Notificações</Text>
+                            <Text style={styles.settingDescription}>
+                                Receber alertas sobre tarefas e aulas
+                            </Text>
                         </View>
-
-                        <View style={styles.settingItem}>
-                            <View style={styles.settingLeft}>
-                                <Text style={styles.settingTitle}>Notificações</Text>
-                                <Text style={styles.settingDescription}>
-                                    Receber alertas sobre tarefas e aulas
-                                </Text>
-                            </View>
-                            <View style={styles.settingRight}>
-                                <Switch
-                                    value={notificationsEnabled}
-                                    onValueChange={setNotificationsEnabled}
-                                    trackColor={{
-                                        false: theme.colors.border,
-                                        true: theme.colors.primary
-                                    }}
-                                    thumbColor={theme.colors.background}
-                                />
-                            </View>
-                        </View>
-
-                        <View style={styles.settingItem}>
-                            <View style={styles.settingLeft}>
-                                <Text style={styles.settingTitle}>Sons</Text>
-                                <Text style={styles.settingDescription}>
-                                    Reproduzir sons para notificações
-                                </Text>
-                            </View>
-                            <View style={styles.settingRight}>
-                                <Switch
-                                    value={soundEnabled}
-                                    onValueChange={setSoundEnabled}
-                                    trackColor={{
-                                        false: theme.colors.border,
-                                        true: theme.colors.primary
-                                    }}
-                                    thumbColor={theme.colors.background}
-                                />
-                            </View>
-                        </View>
-
-                        <View style={[styles.settingItem, styles.settingItemLast]}>
-                            <View style={styles.settingLeft}>
-                                <Text style={styles.settingTitle}>Sincronização Automática</Text>
-                                <Text style={styles.settingDescription}>
-                                    Sincronizar dados automaticamente
-                                </Text>
-                            </View>
-                            <View style={styles.settingRight}>
-                                <Switch
-                                    value={autoSync}
-                                    onValueChange={setAutoSync}
-                                    trackColor={{
-                                        false: theme.colors.border,
-                                        true: theme.colors.primary
-                                    }}
-                                    thumbColor={theme.colors.background}
-                                />
-                            </View>
+                        <View style={styles.settingRight}>
+                            <Switch
+                                value={notificationsEnabled}
+                                onValueChange={setNotificationsEnabled}
+                                trackColor={{
+                                    false: theme.colors.border,
+                                    true: theme.colors.primary
+                                }}
+                                thumbColor={theme.colors.background}
+                            />
                         </View>
                     </View>
 
-                    {/* Ações de Dados */}
+                    <View style={styles.settingItem}>
+                        <View style={styles.settingLeft}>
+                            <Text style={styles.settingTitle}>Sons</Text>
+                            <Text style={styles.settingDescription}>
+                                Reproduzir sons para notificações
+                            </Text>
+                        </View>
+                        <View style={styles.settingRight}>
+                            <Switch
+                                value={soundEnabled}
+                                onValueChange={setSoundEnabled}
+                                trackColor={{
+                                    false: theme.colors.border,
+                                    true: theme.colors.primary
+                                }}
+                                thumbColor={theme.colors.background}
+                            />
+                        </View>
+                    </View>
+
+                    <View style={[styles.settingItem, styles.settingItemLast]}>
+                        <View style={styles.settingLeft}>
+                            <Text style={styles.settingTitle}>Sincronização Automática</Text>
+                            <Text style={styles.settingDescription}>
+                                Sincronizar dados automaticamente
+                            </Text>
+                        </View>
+                        <View style={styles.settingRight}>
+                            <Switch
+                                value={autoSync}
+                                onValueChange={setAutoSync}
+                                trackColor={{
+                                    false: theme.colors.border,
+                                    true: theme.colors.primary
+                                }}
+                                thumbColor={theme.colors.background}
+                            />
+                        </View>
+                    </View>
+                </View>
+
+                {/* Ações de Dados */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>💾 Dados</Text>
+
+                    <TouchableOpacity
+                        style={[styles.settingItem, styles.settingItemLast]}
+                        onPress={handleResetToDemo}
+                    >
+                        <View style={styles.settingLeft}>
+                            <Text style={styles.settingTitle}>Restaurar Dados Demo</Text>
+                            <Text style={styles.settingDescription}>
+                                Restaurar dados de demonstração
+                            </Text>
+                        </View>
+                        <Text style={{ color: theme.colors.primary }}>🔄</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Ações Administrativas - Só para Diretores */}
+                <ShowIf role="director">
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>💾 Dados</Text>
+                        <Text style={styles.sectionTitle}>🛡️ Administração</Text>
+
+                        <TouchableOpacity
+                            style={styles.settingItem}
+                            onPress={() => Alert.alert('Em breve', 'Funcionalidade em desenvolvimento')}
+                        >
+                            <View style={styles.settingLeft}>
+                                <Text style={styles.settingTitle}>Gerenciar Usuários</Text>
+                                <Text style={styles.settingDescription}>
+                                    Adicionar e remover usuários
+                                </Text>
+                            </View>
+                            <Text style={{ color: theme.colors.primary }}>👥</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.settingItem}
+                            onPress={() => Alert.alert('Em breve', 'Funcionalidade em desenvolvimento')}
+                        >
+                            <View style={styles.settingLeft}>
+                                <Text style={styles.settingTitle}>Relatórios</Text>
+                                <Text style={styles.settingDescription}>
+                                    Visualizar relatórios da escola
+                                </Text>
+                            </View>
+                            <Text style={{ color: theme.colors.primary }}>📊</Text>
+                        </TouchableOpacity>
 
                         <TouchableOpacity
                             style={[styles.settingItem, styles.settingItemLast]}
-                            onPress={handleResetToDemo}
+                            onPress={handleClearData}
                         >
                             <View style={styles.settingLeft}>
-                                <Text style={styles.settingTitle}>Restaurar Dados Demo</Text>
+                                <Text style={styles.settingTitle}>Limpar Dados</Text>
                                 <Text style={styles.settingDescription}>
-                                    Restaurar dados de demonstração
+                                    Remover todos os dados locais
                                 </Text>
                             </View>
-                            <Text style={{ color: theme.colors.primary }}>🔄</Text>
+                            <Text style={{ color: theme.colors.error }}>🗑️</Text>
                         </TouchableOpacity>
                     </View>
+                </ShowIf>
 
-                    {/* Ações Administrativas - Só para Diretores */}
-                    <ShowIf role="director">
-                        <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>🛡️ Administração</Text>
+                {/* Botão de Logout */}
+                <TouchableOpacity
+                    style={[styles.button, styles.buttonDanger]}
+                    onPress={handleLogout}
+                >
+                    <Text style={[styles.buttonText, styles.buttonTextDanger]}>
+                        🚪 Sair da Conta
+                    </Text>
+                </TouchableOpacity>
 
-                            <TouchableOpacity
-                                style={styles.settingItem}
-                                onPress={() => Alert.alert('Em breve', 'Funcionalidade em desenvolvimento')}
-                            >
-                                <View style={styles.settingLeft}>
-                                    <Text style={styles.settingTitle}>Gerenciar Usuários</Text>
-                                    <Text style={styles.settingDescription}>
-                                        Adicionar e remover usuários
-                                    </Text>
-                                </View>
-                                <Text style={{ color: theme.colors.primary }}>👥</Text>
-                            </TouchableOpacity>
+                {/* Versão do App */}
+                <View style={styles.version}>
+                    <Text style={styles.versionText}>EduApp v1.0.0</Text>
+                    <Text style={styles.versionText}>
+                        Desenvolvido com ❤️ para educação
+                    </Text>
+                </View>
 
-                            <TouchableOpacity
-                                style={styles.settingItem}
-                                onPress={() => Alert.alert('Em breve', 'Funcionalidade em desenvolvimento')}
-                            >
-                                <View style={styles.settingLeft}>
-                                    <Text style={styles.settingTitle}>Relatórios</Text>
-                                    <Text style={styles.settingDescription}>
-                                        Visualizar relatórios da escola
-                                    </Text>
-                                </View>
-                                <Text style={{ color: theme.colors.primary }}>📊</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.settingItem, styles.settingItemLast]}
-                                onPress={handleClearData}
-                            >
-                                <View style={styles.settingLeft}>
-                                    <Text style={styles.settingTitle}>Limpar Dados</Text>
-                                    <Text style={styles.settingDescription}>
-                                        Remover todos os dados locais
-                                    </Text>
-                                </View>
-                                <Text style={{ color: theme.colors.error }}>🗑️</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </ShowIf>
-
-                    {/* Botão de Logout */}
-                    <TouchableOpacity
-                        style={[styles.button, styles.buttonDanger]}
-                        onPress={handleLogout}
-                    >
-                        <Text style={[styles.buttonText, styles.buttonTextDanger]}>
-                            🚪 Sair da Conta
-                        </Text>
-                    </TouchableOpacity>
-
-                    {/* Versão do App */}
-                    <View style={styles.version}>
-                        <Text style={styles.versionText}>EduApp v1.0.0</Text>
-                        <Text style={styles.versionText}>
-                            Desenvolvido com ❤️ para educação
-                        </Text>
-                    </View>
-
-                    {/* Espaço extra */}
-                    <View style={{ height: 40 }} />
-                </ScrollView>
-            </View>
-        </Protected>
+                {/* Espaço extra */}
+                <View style={{ height: 40 }} />
+            </ScrollView>
+        </View>
     );
 }

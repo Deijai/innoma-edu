@@ -70,4 +70,5 @@ export interface Message {
     isAudio?: boolean;
     audioUri?: string;
     isUser: boolean;
+    isRead?: boolean;
 }

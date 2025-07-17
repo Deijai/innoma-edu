@@ -13,7 +13,7 @@ const ROLE_PERMISSIONS = {
         canCreateClass: false,
         canManageUsers: false,
         canAccessSettings: false,
-        tabs: ['index', 'tasks', 'classroom', 'chat']
+        tabs: ['index', 'tasks', 'classroom', 'chat', 'settings']
     },
     teacher: {
         canViewTasks: true,
