@@ -2,8 +2,14 @@ export interface User {
     id: string;
     name: string;
     email: string;
+    role: 'student' | 'teacher' | 'director';
+    schoolId: string;
     avatar?: string;
-    role: 'student' | 'teacher';
+    isActive: boolean;  // ✅ ADICIONADO
+    createdAt: Date;    // ✅ ADICIONADO
+    updatedAt: Date;    // ✅ ADICIONADO
+    lastLogin?: Date;   // ✅ ADICIONADO
+    fcmToken?: string;  // ✅ ADICIONADO
 }
 
 export interface Course {
