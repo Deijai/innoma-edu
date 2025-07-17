@@ -1,3 +1,6 @@
+// app/(auth)/login.tsx - Versão SIMPLES
+
+import ConnectionStatus from '@/components/ConnectionStatus';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -29,13 +32,25 @@ export default function LoginScreen() {
             return;
         }
 
-        const success = await login(email, password);
-
-        if (success) {
-            router.replace('/(tabs)');
-        } else {
-            Alert.alert('Erro', 'Email ou senha incorretos');
+        try {
+            const success = await login(email, password);
+            if (success) {
+                router.replace('/(tabs)');
+            }
+        } catch (error: any) {
+            Alert.alert('Erro', error.message);
         }
+    };
+
+    const handleDemoLogin = (userType: 'student' | 'teacher') => {
+        const demoCredentials = {
+            student: { email: 'joao@student.com', password: '123456' },
+            teacher: { email: 'maria@teacher.com', password: '123456' }
+        };
+
+        const { email: demoEmail, password: demoPassword } = demoCredentials[userType];
+        setEmail(demoEmail);
+        setPassword(demoPassword);
     };
 
     const styles = StyleSheet.create({
@@ -79,9 +94,6 @@ export default function LoginScreen() {
             borderWidth: 1,
             borderColor: theme.colors.border,
         },
-        inputFocused: {
-            borderColor: theme.colors.primary,
-        },
         passwordContainer: {
             position: 'relative',
         },
@@ -103,6 +115,7 @@ export default function LoginScreen() {
         },
         loginButtonDisabled: {
             backgroundColor: theme.colors.textSecondary,
+            opacity: 0.6,
         },
         loginButtonText: {
             color: 'white',
@@ -135,6 +148,7 @@ export default function LoginScreen() {
             flexDirection: 'row',
             justifyContent: 'center',
             alignItems: 'center',
+            marginBottom: 20,
         },
         signupText: {
             color: theme.colors.textSecondary,
@@ -146,7 +160,7 @@ export default function LoginScreen() {
             fontWeight: '500',
         },
         demoContainer: {
-            marginTop: 30,
+            marginTop: 20,
             padding: 16,
             backgroundColor: theme.colors.surface,
             borderRadius: 12,
@@ -155,12 +169,26 @@ export default function LoginScreen() {
             fontSize: 14,
             fontWeight: 'bold',
             color: theme.colors.text,
-            marginBottom: 8,
+            marginBottom: 12,
+            textAlign: 'center',
         },
-        demoText: {
+        demoButtonsContainer: {
+            flexDirection: 'row',
+            gap: 8,
+        },
+        demoButton: {
+            flex: 1,
+            backgroundColor: theme.colors.primary + '20',
+            borderRadius: 8,
+            padding: 12,
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: theme.colors.primary,
+        },
+        demoButtonText: {
+            color: theme.colors.primary,
             fontSize: 12,
-            color: theme.colors.textSecondary,
-            lineHeight: 16,
+            fontWeight: '600',
         },
     });
 
@@ -170,6 +198,7 @@ export default function LoginScreen() {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
             <ScrollView contentContainerStyle={styles.scrollContainer}>
+                <ConnectionStatus />
                 <Text style={styles.title}>EduApp</Text>
                 <Text style={styles.subtitle}>Entre na sua conta</Text>
 
@@ -241,11 +270,23 @@ export default function LoginScreen() {
                 </View>
 
                 <View style={styles.demoContainer}>
-                    <Text style={styles.demoTitle}>Contas para teste:</Text>
-                    <Text style={styles.demoText}>
-                        Estudante: joao@student.com / 123456{'\n'}
-                        Professor: maria@teacher.com / 123456
-                    </Text>
+                    <Text style={styles.demoTitle}>🚀 Contas Demo</Text>
+
+                    <View style={styles.demoButtonsContainer}>
+                        <TouchableOpacity
+                            style={styles.demoButton}
+                            onPress={() => handleDemoLogin('student')}
+                        >
+                            <Text style={styles.demoButtonText}>👨‍🎓 Estudante</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.demoButton}
+                            onPress={() => handleDemoLogin('teacher')}
+                        >
+                            <Text style={styles.demoButtonText}>👨‍🏫 Professor</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </ScrollView>
         </KeyboardAvoidingView>

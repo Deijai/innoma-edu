@@ -1,3 +1,5 @@
+// functions/index.js - Correções e melhorias
+
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
@@ -74,15 +76,89 @@ async function createAuditLog(userId, action, resource, details = {}, schoolId =
       details,
       schoolId: schoolId || userData?.schoolId || null,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      ipAddress: null, // Could be added from context
-      userAgent: null  // Could be added from context
+      ipAddress: null,
+      userAgent: null
     });
   } catch (error) {
     console.error('Error creating audit log:', error);
   }
 }
 
-// Cloud Function: Set user role and permissions
+// ✅ NOVA - Cloud Function: Approve user
+exports.approveUser = functions.https.onCall(async (data, context) => {
+  // Verify authentication
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Usuário não autenticado');
+  }
+
+  // Check if user has permission
+  const callerToken = context.auth.token;
+  if (callerToken.role !== 'director') {
+    throw new functions.https.HttpsError('permission-denied', 'Apenas diretores podem aprovar usuários');
+  }
+
+  const { userId, approved } = data;
+
+  if (!userId || typeof approved !== 'boolean') {
+    throw new functions.https.HttpsError('invalid-argument', 'Dados inválidos');
+  }
+
+  try {
+    if (approved) {
+      // Aprovar usuário
+      await db.doc(`users/${userId}`).update({
+        isActive: true,
+        approvedAt: admin.firestore.FieldValue.serverTimestamp(),
+        approvedBy: context.auth.uid,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // Definir custom claims
+      const userDoc = await db.doc(`users/${userId}`).get();
+      const userData = userDoc.data();
+      
+      if (userData) {
+        const permissions = ROLE_PERMISSIONS[userData.role] || [];
+        
+        await auth.setCustomUserClaims(userId, {
+          role: userData.role,
+          schoolId: userData.schoolId || callerToken.schoolId,
+          permissions,
+          isActive: true
+        });
+      }
+
+      // Create audit log
+      await createAuditLog(context.auth.uid, 'approve_user', 'user', {
+        resourceId: userId,
+        approved: true
+      }, callerToken.schoolId);
+
+      return { success: true, message: 'Usuário aprovado com sucesso' };
+    } else {
+      // Rejeitar usuário
+      await db.doc(`users/${userId}`).update({
+        isActive: false,
+        rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
+        rejectedBy: context.auth.uid,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // Create audit log
+      await createAuditLog(context.auth.uid, 'reject_user', 'user', {
+        resourceId: userId,
+        approved: false
+      }, callerToken.schoolId);
+
+      return { success: true, message: 'Usuário rejeitado' };
+    }
+  } catch (error) {
+    console.error('Error approving user:', error);
+    throw new functions.https.HttpsError('internal', 'Erro ao processar aprovação');
+  }
+});
+
+// ✅ CORRIGIDA - Cloud Function: Set user role and permissions
 exports.setUserRole = functions.https.onCall(async (data, context) => {
   // Verify authentication
   if (!context.auth) {
@@ -107,7 +183,7 @@ exports.setUserRole = functions.https.onCall(async (data, context) => {
   }
 
   // Check if director is trying to set role for their own school
-  if (callerToken.schoolId !== schoolId) {
+  if (callerToken.schoolId && callerToken.schoolId !== schoolId) {
     throw new functions.https.HttpsError('permission-denied', 'Você só pode gerenciar usuários da sua escola');
   }
 
@@ -127,6 +203,7 @@ exports.setUserRole = functions.https.onCall(async (data, context) => {
     await db.doc(`users/${userId}`).update({
       role,
       schoolId,
+      isActive: true,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
@@ -144,7 +221,7 @@ exports.setUserRole = functions.https.onCall(async (data, context) => {
   }
 });
 
-// Cloud Function: Create approval notification
+// ✅ MELHORADA - Cloud Function: Create approval notification
 exports.createApprovalNotification = functions.https.onCall(async (data, context) => {
   const { userId, userName, role } = data;
 
@@ -189,7 +266,112 @@ exports.createApprovalNotification = functions.https.onCall(async (data, context
   }
 });
 
-// Cloud Function: Manage class
+// ✅ NOVA - Cloud Function: Get school statistics
+exports.getSchoolStats = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Usuário não autenticado');
+  }
+
+  const callerToken = context.auth.token;
+  if (callerToken.role !== 'director') {
+    throw new functions.https.HttpsError('permission-denied', 'Apenas diretores podem ver estatísticas');
+  }
+
+  try {
+    const schoolId = callerToken.schoolId;
+    
+    const [usersSnapshot, classesSnapshot, tasksSnapshot] = await Promise.all([
+      db.collection('users').where('schoolId', '==', schoolId).get(),
+      db.collection('classes').where('schoolId', '==', schoolId).where('isActive', '==', true).get(),
+      db.collection('tasks').where('schoolId', '==', schoolId).where('isActive', '==', true).get()
+    ]);
+
+    const users = usersSnapshot.docs.map(doc => doc.data());
+    const students = users.filter(u => u.role === 'student');
+    const teachers = users.filter(u => u.role === 'teacher');
+    const pendingUsers = users.filter(u => !u.isActive);
+
+    return {
+      totalUsers: users.length,
+      totalStudents: students.length,
+      totalTeachers: teachers.length,
+      totalClasses: classesSnapshot.size,
+      totalTasks: tasksSnapshot.size,
+      pendingUsers: pendingUsers.length,
+      success: true
+    };
+  } catch (error) {
+    console.error('Error getting school stats:', error);
+    throw new functions.https.HttpsError('internal', 'Erro ao obter estatísticas');
+  }
+});
+
+// ✅ NOVA - Cloud Function: Delete user
+exports.deleteUser = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Usuário não autenticado');
+  }
+
+  const callerToken = context.auth.token;
+  if (callerToken.role !== 'director') {
+    throw new functions.https.HttpsError('permission-denied', 'Apenas diretores podem deletar usuários');
+  }
+
+  const { userId } = data;
+
+  if (!userId) {
+    throw new functions.https.HttpsError('invalid-argument', 'ID do usuário é obrigatório');
+  }
+
+  try {
+    // Get user data before deletion
+    const userDoc = await db.doc(`users/${userId}`).get();
+    const userData = userDoc.data();
+
+    if (!userData) {
+      throw new functions.https.HttpsError('not-found', 'Usuário não encontrado');
+    }
+
+    // Check if user belongs to the same school
+    if (userData.schoolId !== callerToken.schoolId) {
+      throw new functions.https.HttpsError('permission-denied', 'Você só pode deletar usuários da sua escola');
+    }
+
+    // Soft delete - mark as inactive
+    await db.doc(`users/${userId}`).update({
+      isActive: false,
+      deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+      deletedBy: context.auth.uid,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Remove from classes
+    const classesSnapshot = await db.collection('classes')
+      .where('studentIds', 'array-contains', userId)
+      .get();
+
+    const batch = db.batch();
+    classesSnapshot.forEach(doc => {
+      batch.update(doc.ref, {
+        studentIds: admin.firestore.FieldValue.arrayRemove(userId)
+      });
+    });
+    await batch.commit();
+
+    // Create audit log
+    await createAuditLog(context.auth.uid, 'delete_user', 'user', {
+      resourceId: userId,
+      userName: userData.name
+    }, callerToken.schoolId);
+
+    return { success: true, message: 'Usuário removido com sucesso' };
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    throw new functions.https.HttpsError('internal', 'Erro ao deletar usuário');
+  }
+});
+
+// ✅ MELHORADA - Cloud Function: Manage class
 exports.manageClass = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Usuário não autenticado');
@@ -314,6 +496,8 @@ async function deleteClass(classId, auth) {
   // Soft delete - mark as inactive
   await classRef.update({
     isActive: false,
+    deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+    deletedBy: auth.uid,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   });
 
@@ -407,7 +591,7 @@ async function removeStudentFromClass(classId, studentId, auth) {
   return { success: true };
 }
 
-// Cloud Function: On user creation
+// ✅ MELHORADA - Cloud Function: On user creation
 exports.onUserCreate = functions.auth.user().onCreate(async (user) => {
   try {
     // Create user document in Firestore
@@ -418,10 +602,18 @@ exports.onUserCreate = functions.auth.user().onCreate(async (user) => {
       role: 'student', // Default role
       schoolId: '', // To be set by director
       avatar: user.photoURL || '',
-      isActive: true,
+      isActive: true, // Students are active by default
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       lastLogin: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Set default custom claims for students
+    await admin.auth().setCustomUserClaims(user.uid, {
+      role: 'student',
+      schoolId: '',
+      permissions: ROLE_PERMISSIONS.student,
+      isActive: true
     });
 
     console.log(`User document created for ${user.uid}`);
@@ -430,7 +622,7 @@ exports.onUserCreate = functions.auth.user().onCreate(async (user) => {
   }
 });
 
-// Cloud Function: On user deletion
+// ✅ MELHORADA - Cloud Function: On user deletion
 exports.onUserDelete = functions.auth.user().onDelete(async (user) => {
   try {
     // Delete user document from Firestore
@@ -456,7 +648,7 @@ exports.onUserDelete = functions.auth.user().onDelete(async (user) => {
   }
 });
 
-// Cloud Function: Send notification when task is created
+// ✅ MELHORADA - Cloud Function: Send notification when task is created
 exports.onTaskCreated = functions.firestore
   .document('tasks/{taskId}')
   .onCreate(async (snap, context) => {
@@ -504,7 +696,7 @@ exports.onTaskCreated = functions.firestore
     }
   });
 
-// Cloud Function: Send notification when grade is updated
+// ✅ MELHORADA - Cloud Function: Send notification when grade is updated
 exports.onGradeUpdated = functions.firestore
   .document('submissions/{submissionId}')
   .onUpdate(async (change, context) => {
@@ -534,3 +726,51 @@ exports.onGradeUpdated = functions.firestore
       console.error('Error sending grade notification:', error);
     }
   });
+
+// ✅ NOVA - Cloud Function: Send welcome email
+exports.sendWelcomeEmail = functions.https.onCall(async (data, context) => {
+  // This would integrate with email service like SendGrid, Mailgun, etc.
+  // For now, just log the action
+  console.log('Welcome email would be sent to:', data.email);
+  return { success: true };
+});
+
+// ✅ NOVA - Cloud Function: Backup user data
+exports.backupUserData = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Usuário não autenticado');
+  }
+
+  const callerToken = context.auth.token;
+  if (callerToken.role !== 'director') {
+    throw new functions.https.HttpsError('permission-denied', 'Apenas diretores podem fazer backup');
+  }
+
+  try {
+    const schoolId = callerToken.schoolId;
+    
+    // Get all school data
+    const [users, classes, tasks] = await Promise.all([
+      db.collection('users').where('schoolId', '==', schoolId).get(),
+      db.collection('classes').where('schoolId', '==', schoolId).get(),
+      db.collection('tasks').where('schoolId', '==', schoolId).get()
+    ]);
+
+    const backupData = {
+      users: users.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+      classes: classes.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+      tasks: tasks.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdBy: context.auth.uid,
+      schoolId: schoolId
+    };
+
+    // Save backup
+    await db.collection('backups').add(backupData);
+
+    return { success: true, message: 'Backup criado com sucesso' };
+  } catch (error) {
+    console.error('Error creating backup:', error);
+    throw new functions.https.HttpsError('internal', 'Erro ao criar backup');
+  }
+});

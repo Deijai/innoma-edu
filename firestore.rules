@@ -1,0 +1,333 @@
+// firestore.rules - Regras de segurança completas
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserRole() {
+      return request.auth.token.role;
+    }
+    
+    function getSchoolId() {
+      return request.auth.token.schoolId;
+    }
+    
+    function isActive() {
+      return request.auth.token.isActive == true;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isStudent() {
+      return getUserRole() == 'student';
+    }
+    
+    function isTeacher() {
+      return getUserRole() == 'teacher';
+    }
+    
+    function isDirector() {
+      return getUserRole() == 'director';
+    }
+    
+    function belongsToSameSchool(schoolId) {
+      return getSchoolId() == schoolId;
+    }
+    
+    function hasPermission(permission) {
+      return permission in request.auth.token.permissions;
+    }
+
+    // ========================================
+    // USERS COLLECTION
+    // ========================================
+    match /users/{userId} {
+      // Read: Users can read their own data, teachers can read students from their school, directors can read all from their school
+      allow read: if isAuthenticated() && isActive() && (
+        isOwner(userId) ||
+        (isTeacher() && belongsToSameSchool(resource.data.schoolId)) ||
+        (isDirector() && belongsToSameSchool(resource.data.schoolId))
+      );
+      
+      // Write: Users can update their own data, directors can manage all users from their school
+      allow write: if isAuthenticated() && isActive() && (
+        (isOwner(userId) && 
+         request.resource.data.role == resource.data.role && // Can't change own role
+         request.resource.data.schoolId == resource.data.schoolId) || // Can't change own school
+        (isDirector() && 
+         belongsToSameSchool(request.resource.data.schoolId) &&
+         hasPermission('manage_users'))
+      );
+      
+      // Create: Only during signup process or by directors
+      allow create: if isAuthenticated() && (
+        isOwner(userId) ||
+        (isDirector() && 
+         belongsToSameSchool(request.resource.data.schoolId) &&
+         hasPermission('manage_users'))
+      );
+      
+      // Delete: Only directors can delete users from their school
+      allow delete: if isAuthenticated() && isActive() && 
+        isDirector() && 
+        belongsToSameSchool(resource.data.schoolId) &&
+        hasPermission('manage_users');
+    }
+
+    // ========================================
+    // CLASSES COLLECTION
+    // ========================================
+    match /classes/{classId} {
+      // Read: Teachers can read their own classes, students can read classes they're enrolled in, directors can read all from their school
+      allow read: if isAuthenticated() && isActive() && (
+        (isTeacher() && resource.data.teacherId == request.auth.uid) ||
+        (isStudent() && request.auth.uid in resource.data.studentIds) ||
+        (isDirector() && belongsToSameSchool(resource.data.schoolId))
+      );
+      
+      // Write: Teachers can update their own classes, directors can manage all classes from their school
+      allow write: if isAuthenticated() && isActive() && (
+        (isTeacher() && 
+         resource.data.teacherId == request.auth.uid &&
+         hasPermission('edit_class')) ||
+        (isDirector() && 
+         belongsToSameSchool(resource.data.schoolId) &&
+         hasPermission('edit_class'))
+      );
+      
+      // Create: Teachers and directors can create classes
+      allow create: if isAuthenticated() && isActive() && (
+        (isTeacher() && 
+         request.resource.data.teacherId == request.auth.uid &&
+         belongsToSameSchool(request.resource.data.schoolId) &&
+         hasPermission('create_class')) ||
+        (isDirector() && 
+         belongsToSameSchool(request.resource.data.schoolId) &&
+         hasPermission('create_class'))
+      );
+      
+      // Delete: Only directors can delete classes
+      allow delete: if isAuthenticated() && isActive() && 
+        isDirector() && 
+        belongsToSameSchool(resource.data.schoolId) &&
+        hasPermission('delete_class');
+    }
+
+    // ========================================
+    // TASKS COLLECTION
+    // ========================================
+    match /tasks/{taskId} {
+      // Read: Students can read tasks from their classes, teachers can read their own tasks, directors can read all from their school
+      allow read: if isAuthenticated() && isActive() && (
+        (isStudent() && taskBelongsToStudentClass(resource.data.classId)) ||
+        (isTeacher() && resource.data.createdBy == request.auth.uid) ||
+        (isDirector() && belongsToSameSchool(resource.data.schoolId))
+      );
+      
+      // Write: Teachers can update their own tasks, directors can manage all tasks from their school
+      allow write: if isAuthenticated() && isActive() && (
+        (isTeacher() && 
+         resource.data.createdBy == request.auth.uid &&
+         hasPermission('edit_task')) ||
+        (isDirector() && 
+         belongsToSameSchool(resource.data.schoolId) &&
+         hasPermission('edit_task'))
+      );
+      
+      // Create: Teachers and directors can create tasks
+      allow create: if isAuthenticated() && isActive() && (
+        (isTeacher() && 
+         request.resource.data.createdBy == request.auth.uid &&
+         belongsToSameSchool(request.resource.data.schoolId) &&
+         hasPermission('create_task')) ||
+        (isDirector() && 
+         belongsToSameSchool(request.resource.data.schoolId) &&
+         hasPermission('create_task'))
+      );
+      
+      // Delete: Only directors can delete tasks
+      allow delete: if isAuthenticated() && isActive() && 
+        isDirector() && 
+        belongsToSameSchool(resource.data.schoolId) &&
+        hasPermission('delete_task');
+    }
+
+    // ========================================
+    // SUBMISSIONS COLLECTION
+    // ========================================
+    match /submissions/{submissionId} {
+      // Read: Students can read their own submissions, teachers can read submissions from their tasks, directors can read all from their school
+      allow read: if isAuthenticated() && isActive() && (
+        (isStudent() && resource.data.studentId == request.auth.uid) ||
+        (isTeacher() && taskBelongsToTeacher(resource.data.taskId)) ||
+        (isDirector() && belongsToSameSchool(resource.data.schoolId))
+      );
+      
+      // Write: Students can update their own submissions, teachers can grade submissions from their tasks
+      allow write: if isAuthenticated() && isActive() && (
+        (isStudent() && 
+         resource.data.studentId == request.auth.uid &&
+         resource.data.status == 'pending') || // Can only edit pending submissions
+        (isTeacher() && 
+         taskBelongsToTeacher(resource.data.taskId) &&
+         hasPermission('grade_submissions')) ||
+        (isDirector() && 
+         belongsToSameSchool(resource.data.schoolId) &&
+         hasPermission('grade_submissions'))
+      );
+      
+      // Create: Students can create submissions for tasks in their classes
+      allow create: if isAuthenticated() && isActive() && 
+        isStudent() && 
+        request.resource.data.studentId == request.auth.uid &&
+        taskBelongsToStudentClass(request.resource.data.taskId);
+      
+      // Delete: Students can delete their own pending submissions, teachers and directors can delete submissions from their tasks
+      allow delete: if isAuthenticated() && isActive() && (
+        (isStudent() && 
+         resource.data.studentId == request.auth.uid &&
+         resource.data.status == 'pending') ||
+        (isTeacher() && taskBelongsToTeacher(resource.data.taskId)) ||
+        (isDirector() && belongsToSameSchool(resource.data.schoolId))
+      );
+    }
+
+    // ========================================
+    // MESSAGES COLLECTION
+    // ========================================
+    match /messages/{messageId} {
+      // Read: Users can read messages from classes they belong to, directors can read all from their school
+      allow read: if isAuthenticated() && isActive() && (
+        (resource.data.targetType == 'class' && classAccessible(resource.data.targetId)) ||
+        (resource.data.targetType == 'direct' && 
+         (resource.data.targetId == request.auth.uid || resource.data.senderId == request.auth.uid)) ||
+        (isDirector() && belongsToSameSchool(resource.data.schoolId))
+      );
+      
+      // Write: Users can update their own messages
+      allow write: if isAuthenticated() && isActive() && 
+        resource.data.senderId == request.auth.uid;
+      
+      // Create: Users can create messages in classes they belong to
+      allow create: if isAuthenticated() && isActive() && 
+        request.resource.data.senderId == request.auth.uid && (
+          (request.resource.data.targetType == 'class' && classAccessible(request.resource.data.targetId)) ||
+          (request.resource.data.targetType == 'direct') ||
+          (isDirector() && request.resource.data.targetType == 'school')
+        );
+      
+      // Delete: Users can delete their own messages, directors can delete any message from their school
+      allow delete: if isAuthenticated() && isActive() && (
+        resource.data.senderId == request.auth.uid ||
+        (isDirector() && belongsToSameSchool(resource.data.schoolId) && hasPermission('moderate_chat'))
+      );
+    }
+
+    // ========================================
+    // NOTIFICATIONS COLLECTION
+    // ========================================
+    match /notifications/{notificationId} {
+      // Read: Users can read their own notifications
+      allow read: if isAuthenticated() && isActive() && 
+        resource.data.targetUserId == request.auth.uid;
+      
+      // Write: Users can update their own notifications (mark as read)
+      allow write: if isAuthenticated() && isActive() && 
+        resource.data.targetUserId == request.auth.uid;
+      
+      // Create: System creates notifications (handled by Cloud Functions)
+      allow create: if false;
+      
+      // Delete: Users can delete their own notifications
+      allow delete: if isAuthenticated() && isActive() && 
+        resource.data.targetUserId == request.auth.uid;
+    }
+
+    // ========================================
+    // AUDIT LOGS COLLECTION
+    // ========================================
+    match /audit_logs/{logId} {
+      // Read: Only directors can read audit logs from their school
+      allow read: if isAuthenticated() && isActive() && 
+        isDirector() && 
+        belongsToSameSchool(resource.data.schoolId) &&
+        hasPermission('view_audit_logs');
+      
+      // Write/Create/Delete: Only system (Cloud Functions) can manage audit logs
+      allow write, create, delete: if false;
+    }
+
+    // ========================================
+    // SCHOOLS COLLECTION
+    // ========================================
+    match /schools/{schoolId} {
+      // Read: Directors can read their own school data
+      allow read: if isAuthenticated() && isActive() && 
+        isDirector() && 
+        belongsToSameSchool(schoolId);
+      
+      // Write: Directors can update their own school data
+      allow write: if isAuthenticated() && isActive() && 
+        isDirector() && 
+        belongsToSameSchool(schoolId) &&
+        hasPermission('configure_school');
+      
+      // Create: System creates schools (handled by Cloud Functions or admin)
+      allow create: if false;
+      
+      // Delete: Only system can delete schools
+      allow delete: if false;
+    }
+
+    // ========================================
+    // BACKUPS COLLECTION
+    // ========================================
+    match /backups/{backupId} {
+      // Read: Only directors can read backups from their school
+      allow read: if isAuthenticated() && isActive() && 
+        isDirector() && 
+        belongsToSameSchool(resource.data.schoolId) &&
+        hasPermission('export_data');
+      
+      // Write/Create/Delete: Only system (Cloud Functions) can manage backups
+      allow write, create, delete: if false;
+    }
+
+    // ========================================
+    // HELPER FUNCTIONS
+    // ========================================
+    
+    // Check if a task belongs to a student's class
+    function taskBelongsToStudentClass(taskId) {
+      let task = get(/databases/$(database)/documents/tasks/$(taskId));
+      let classDoc = get(/databases/$(database)/documents/classes/$(task.data.classId));
+      return request.auth.uid in classDoc.data.studentIds;
+    }
+    
+    // Check if a task belongs to a teacher
+    function taskBelongsToTeacher(taskId) {
+      let task = get(/databases/$(database)/documents/tasks/$(taskId));
+      return task.data.createdBy == request.auth.uid;
+    }
+    
+    // Check if a class is accessible to the current user
+    function classAccessible(classId) {
+      let classDoc = get(/databases/$(database)/documents/classes/$(classId));
+      return (isTeacher() && classDoc.data.teacherId == request.auth.uid) ||
+             (isStudent() && request.auth.uid in classDoc.data.studentIds) ||
+             (isDirector() && belongsToSameSchool(classDoc.data.schoolId));
+    }
+    
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
