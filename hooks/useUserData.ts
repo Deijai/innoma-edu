@@ -1,8 +1,8 @@
 // hooks/useUserData.ts - Hooks CORRIGIDOS sem dependências complexas
 
 import { useMemo } from 'react';
-import { useAppStore } from '../store/appStore';
 import { useAuthStore } from '../store/authStore';
+import { useDataStore } from '../store/dataStore';
 
 // ==========================================
 // HOOK PRINCIPAL DO USUÁRIO
@@ -10,7 +10,7 @@ import { useAuthStore } from '../store/authStore';
 
 export const useUserData = () => {
     const { user, isAuthenticated, isInitialized } = useAuthStore();
-    const { courses, tasks, classes } = useAppStore();
+    const { courses, tasks, classes } = useDataStore();
 
     // Dados específicos do usuário baseados no role
     const userData = useMemo(() => {
@@ -49,7 +49,7 @@ export const useUserData = () => {
         });
 
         // Dados específicos por role
-        const stats = {
+        const baseStats = {
             totalTasks: tasks.length,
             completedTasks: completedTasks.length,
             pendingTasks: pendingTasks.length,
@@ -67,27 +67,35 @@ export const useUserData = () => {
                     myTasks: tasks,
                     myClasses: classes,
                     todaySchedule: todayClasses,
-                    stats,
+                    stats: baseStats,
                 };
 
             case 'teacher':
+                // Calcular estatísticas específicas para professor
+                const teachingCourses = courses.filter(course => course.teacher === user.name);
+                const totalStudentsTeaching = teachingCourses.reduce((sum, course) => sum + course.students, 0);
+
                 return {
                     ...baseData,
-                    teachingCourses: courses.filter(course => course.teacher === user.name),
+                    teachingCourses,
                     myTasks: tasks,
                     myClasses: classes,
                     todaySchedule: todayClasses,
                     stats: {
-                        ...stats,
-                        coursesTeaching: courses.filter(course => course.teacher === user.name).length,
-                        totalStudents: courses.reduce((sum, course) =>
-                            course.teacher === user.name ? sum + course.students : sum, 0),
-                        tasksCreated: tasks.length,
-                        classesScheduled: classes.length,
+                        ...baseStats,
+                        // Estatísticas específicas para professor
+                        coursesTeaching: teachingCourses.length,
+                        totalStudentsTeaching,
                     },
                 };
 
             case 'director':
+                // Calcular estatísticas específicas para diretor
+                const totalTeachers = new Set(courses.map(course => course.teacher)).size;
+                const totalStudentsSchool = courses.reduce((sum, course) => sum + course.students, 0);
+                const completionRate = tasks.length > 0 ?
+                    Math.round((completedTasks.length / tasks.length) * 100) : 0;
+
                 return {
                     ...baseData,
                     allCourses: courses,
@@ -95,17 +103,17 @@ export const useUserData = () => {
                     allClasses: classes,
                     todaySchedule: todayClasses,
                     stats: {
-                        ...stats,
+                        ...baseStats,
+                        // Estatísticas específicas para diretor
                         totalCourses: courses.length,
-                        totalStudents: courses.reduce((sum, course) => sum + course.students, 0),
-                        totalTeachers: new Set(courses.map(course => course.teacher)).size,
-                        completionRate: tasks.length > 0 ?
-                            Math.round((completedTasks.length / tasks.length) * 100) : 0,
+                        totalTeachers,
+                        totalStudentsSchool,
+                        completionRate,
                     },
                 };
 
             default:
-                return { ...baseData, stats };
+                return { ...baseData, stats: baseStats };
         }
     }, [user, isAuthenticated, courses, tasks, classes]);
 
@@ -126,7 +134,7 @@ export const useUserData = () => {
 
 export const useDashboardData = () => {
     const { userData, user } = useUserData();
-    const { tasks, classes } = useAppStore();
+    const { tasks, classes } = useDataStore();
 
     // Dados do dashboard baseados no role
     const dashboardData = useMemo(() => {
@@ -178,7 +186,7 @@ export const useDashboardData = () => {
 
 export const useProgressData = () => {
     const { user } = useUserData();
-    const { tasks, courses } = useAppStore();
+    const { tasks, courses } = useDataStore();
 
     const progressData = useMemo(() => {
         if (!user) return null;
@@ -228,7 +236,7 @@ export const useProgressData = () => {
 
 export const useNotifications = () => {
     const { user } = useUserData();
-    const { tasks, classes } = useAppStore();
+    const { tasks, classes } = useDataStore();
 
     const notifications = useMemo(() => {
         if (!user) return [];

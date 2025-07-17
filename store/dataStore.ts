@@ -446,7 +446,7 @@ export const useClassesData = () => {
 export const useMessagesData = () => {
     const { messages, addMessage, markMessageAsRead } = useDataStore();
 
-    const unreadMessages = messages.filter(msg => !msg.sender);
+    const unreadMessages = messages.filter(msg => !msg.isRead);
 
     return {
         messages,
